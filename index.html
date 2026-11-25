@@ -1,0 +1,1173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>if("serviceWorker"in navigator&&location.protocol==="https:")addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10302A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Letter Game">
+<meta name="description" content="The letter game, اسم حيوان نبات جماد بلاد: a letter comes up and everyone fills each category. Arabic or English, online with friends on your phones. Free.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect x=%276%27 y=%276%27 width=%2752%27 height=%2752%27 rx=%2714%27 fill=%27%23FFD166%27/%3E%3Ctext x=%2732%27 y=%2746%27 font-size=%2738%27 font-weight=%27900%27 text-anchor=%27middle%27 fill=%27%2310302A%27 font-family=%27Arial%27%3EA%3C/text%3E%3C/svg%3E">
+<title>Letter Game · اسم حيوان نبات · Game Night</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@600;700;800&family=Manrope:wght@500;600;700;800&display=swap" media="print" onload="this.media='all'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@600;700;800&family=Manrope:wght@500;600;700;800&display=swap"></noscript>
+<script>/* connection tools load in the background, so the page shows at once; room actions wait for NET */window.NET=Promise.all(['vendor/peerjs-1.5.4.min.js','vendor/mqtt-5.10.1.min.js'].map(function(s){return new Promise(function(r){var e=document.createElement('script');e.src=s;e.async=false;e.onload=e.onerror=function(){r()};document.head.appendChild(e)})})).then(function(){window.NET_DONE=1});</script>
+<script>/* Game Night mode: only on night links */if(/[?&]night=/.test(location.search))document.write('<script src="/night.js"><\/script>')</script>
+<style>
+/* Layout: a quiz-show stage. The question big in the middle, a countdown ring, your number pad underneath; the reveal draws everyone's guess on a line with the real answer. */
+:root {
+  --bg: #0D1A33;
+  --bg-2: #081022;
+  --bg-glow: #1B3566;
+  --panel: #12244A;
+  --shade: rgba(0, 0, 0, .24);
+  --ink: #F2F5FC;
+  --muted: #A3B1D1;
+  --line: rgba(242, 245, 252, .14);
+  --accent: #FF9F1C;
+  --accent-soft: rgba(255, 159, 28, .3);
+  --on-accent: #2B1600;
+  --mint: #5EE0B5;
+  --pink: #FF5E7E;
+  --danger: #FF8A9A;
+  --shadow: rgba(0, 0, 0, .5);
+  --backdrop: rgba(4, 9, 20, .78);
+  --f-display: 'Rubik', 'Trebuchet MS', system-ui, sans-serif;
+  --f-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image: radial-gradient(ellipse at 50% 30%, var(--bg-glow), var(--bg) 60%, var(--bg-2));
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.4;
+  padding-left: max(14px, env(safe-area-inset-left, 0px));
+  padding-right: max(14px, env(safe-area-inset-right, 0px));
+  overflow-x: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; line-height: 1.1; font-weight: 800; text-wrap: balance; }
+
+.screen { min-height: 100%; display: grid; place-items: center; padding-block: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-bottom, 0px)); }
+.panel { width: min(100%, 460px); display: flex; flex-direction: column; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 24px 20px; box-shadow: 0 20px 50px var(--shadow); }
+.logo { font-size: 34px; display: flex; align-items: center; gap: 12px; }
+.logo svg { width: 42px; height: 42px; flex: none; }
+.tagline { margin: 6px 0 0; color: var(--muted); }
+.block { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.block h3 { font-size: 17px; font-weight: 700; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row > * { min-width: 0; }
+.grow { flex: 1; }
+.input { font: inherit; font-size: 16px; min-height: 46px; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); color: var(--ink); width: 100%; }
+.code-input { text-transform: uppercase; letter-spacing: .3em; font-weight: 800; }
+.msg { min-height: 20px; font-weight: 700; font-size: 13.5px; color: var(--muted); }
+.msg.err { color: var(--danger); }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+.eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.room-code { font-family: var(--f-display); font-weight: 800; font-size: 48px; letter-spacing: .16em; color: var(--accent); line-height: 1; }
+.share { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.share code { background: var(--bg-2); border: 1px solid var(--line); padding: 6px 9px; border-radius: 8px; word-break: break-all; flex: 1; min-width: 0; font-family: var(--f-body); }
+.plist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.plist li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); }
+.plist .nm { font-weight: 800; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--mint); flex: none; }
+.dot.off { background: var(--danger); }
+.dot.cpu { background: var(--muted); }
+.x { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 6px 12px; min-height: 36px; font-size: 13px; font-weight: 700; }
+.set-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.set-row label { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 800; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.set-row select { min-height: 42px; padding: 6px 10px; }
+.btn { border-radius: 12px; padding: 12px 14px; font-weight: 800; font-size: 15px; border: 1px solid var(--line); background: var(--shade); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:not(:disabled):hover { filter: brightness(.93); }
+.ghost { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; min-height: 38px; font-size: 13px; font-weight: 700; color: var(--ink); }
+@media (hover: hover) { .ghost:hover { border-color: var(--accent); } }
+
+/* Game */
+#app { height: 100%; max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; padding-block: max(8px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-bottom, 0px)); }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand h1 { font-size: 21px; }
+.brand p { margin: 1px 0 0; font-size: 11px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; font-weight: 700; }
+.net { color: var(--mint); }
+.net.warn { color: var(--accent); }
+.top-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+#btnMenu { display: none; }
+.menu-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.menu-list .btn { text-align: left; }
+
+.people { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.people::-webkit-scrollbar { display: none; }
+.who { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 10px; min-width: 70px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); }
+.who .n { font-weight: 800; font-size: 12.5px; max-width: 86px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who .s { font-family: var(--f-display); font-weight: 800; font-size: 17px; color: var(--accent); line-height: 1; }
+.who .t { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.who.done { border-color: var(--mint); }
+.who.done .t { color: var(--mint); }
+.who.me { box-shadow: inset 0 0 0 1px var(--accent); }
+
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 8px 4px; overflow-y: auto; }
+.qno { font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.question { font-family: var(--f-display); font-weight: 800; font-size: 27px; line-height: 1.2; max-width: 22ch; text-wrap: balance; }
+.clock { --p: 1; width: 66px; height: 66px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--accent) calc(var(--p) * 360deg), rgba(255,255,255,.08) 0); position: relative; font-family: var(--f-display); font-weight: 800; font-size: 22px; }
+.clock::before { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: var(--bg); }
+.clock span { position: relative; }
+.clock.low { background: conic-gradient(var(--pink) calc(var(--p) * 360deg), rgba(255,255,255,.08) 0); }
+.answer-big { font-family: var(--f-display); font-weight: 800; font-size: 46px; color: var(--mint); line-height: 1; animation: pop .45s ease both; }
+.answer-note { font-size: 13px; color: var(--muted); font-weight: 600; max-width: 40ch; }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* the number line on the reveal */
+.line { position: relative; width: 100%; max-width: 520px; height: 64px; margin: 6px 0 0; }
+.line .bar { position: absolute; left: 0; right: 0; top: 34px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.14); }
+.line .mark { position: absolute; top: 24px; width: 3px; height: 24px; margin-left: -1.5px; background: var(--mint); border-radius: 2px; }
+.line .mark b { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--mint); white-space: nowrap; }
+.line .pin { position: absolute; top: 4px; transform: translateX(-50%); font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); white-space: nowrap; max-width: 90px; overflow: hidden; text-overflow: ellipsis; animation: drop .5s ease both; }
+.line .pin.win { border-color: var(--accent); color: var(--accent); }
+.line .pin::after { content: ''; position: absolute; left: 50%; top: 100%; width: 2px; height: var(--stem, 9px); background: var(--muted); margin-left: -1px; }
+@keyframes drop { from { transform: translate(-50%, -12px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
+
+.results { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 5px; }
+.results li { display: grid; grid-template-columns: 26px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); text-align: left; animation: pop .35s ease both; }
+.results li.me-row { border-color: var(--accent); }
+.results .rk { font-family: var(--f-display); font-weight: 800; color: var(--accent); }
+.results .nm { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results .nm small { display: block; color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.results .g { font-variant-numeric: tabular-nums; font-weight: 800; }
+.results .pt { font-weight: 800; color: var(--mint); min-width: 30px; text-align: right; }
+.results .pt.zero { color: var(--muted); }
+
+.act { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+.act.mine { border-color: var(--accent); }
+.status { font-size: 15px; font-weight: 800; }
+.act.mine .status { color: var(--accent); }
+.sub { font-size: 13px; color: var(--muted); font-weight: 600; }
+.guess-form { display: flex; gap: 8px; }
+.guess-form .input { flex: 1; font-family: var(--f-display); font-size: 24px; font-weight: 800; text-align: center; letter-spacing: .02em; }
+.guess-form .btn { min-width: 110px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions .btn { flex: 1; }
+
+.log { font-size: 12.5px; color: var(--muted); }
+.log summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 2px 0; }
+.log ol { margin: 6px 0 0; padding: 8px 12px 8px 30px; max-height: 140px; overflow-y: auto; background: var(--shade); border-radius: 10px; border: 1px solid var(--line); }
+
+.modal { position: fixed; inset: 0; z-index: 20; background: var(--backdrop); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.sheet { width: min(100%, 520px); max-height: 100%; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 22px 20px; box-shadow: 0 20px 50px var(--shadow); }
+.sheet h2 { font-size: 25px; margin-bottom: 4px; }
+.sheet h2 span { color: var(--accent); }
+.sheet .lede { color: var(--muted); margin: 0 0 14px; }
+.sheet ul.rules { margin: 0 0 16px; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; }
+.sheet ul.rules b { color: var(--accent); }
+.order { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.order li { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); }
+.order li.me-row { border-color: var(--accent); }
+.order .pl { font-family: var(--f-display); font-weight: 800; color: var(--accent); font-size: 18px; }
+.order .nm { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order .pts { font-variant-numeric: tabular-nums; font-weight: 800; text-align: right; min-width: 52px; }
+.order .pts small { display: block; color: var(--muted); font-weight: 600; font-size: 11px; }
+.sheet-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+@media (max-width: 560px) {
+  #btnRules, #btnScores, #btnLeave { display: none; }
+  #btnMenu { display: inline-block; }
+  .room-code { font-size: 40px; }
+  .question { font-size: 23px; }
+  .answer-big { font-size: 40px; }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .brand p, .log { display: none; }
+  .question { font-size: 20px; }
+  .clock { width: 48px; height: 48px; font-size: 17px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Letter game: a green school notebook */
+:root { --bg: #10302A; --bg-2: #08201B; --bg-glow: #1D5446; --panel: #163F36; --accent: #FFD166; --on-accent: #2B2000; --mint: #7BE0A6; --pink: #FF7A8A; }
+.letter { width: 112px; height: 112px; border-radius: 26px; display: grid; place-items: center; background: var(--accent); color: #10302A; font-family: var(--f-display); font-weight: 800; font-size: 68px; line-height: 1; box-shadow: 0 8px 24px rgba(0,0,0,.4), inset 0 -6px 0 rgba(0,0,0,.15); animation: pop .5s ease both; }
+.letter.small { width: 64px; height: 64px; font-size: 38px; border-radius: 16px; }
+.fields { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 520px; }
+.field { display: grid; grid-template-columns: 7.5em 1fr; align-items: center; gap: 10px; }
+.field label { font-weight: 800; font-size: 14px; color: var(--muted); text-align: start; }
+.field .input { min-height: 46px; font-weight: 700; }
+.field .input.bad { border-color: var(--pink); }
+.field .input.good { border-color: var(--mint); }
+.stop-btn { background: var(--pink); border-color: var(--pink); color: #fff; font-family: var(--f-display); letter-spacing: .08em; font-size: 18px; }
+.stop-banner { font-family: var(--f-display); font-weight: 800; font-size: 24px; color: var(--pink); animation: pop .3s ease both; }
+.sets { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 6px 12px; min-height: 36px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.chip[aria-pressed="true"] { background: rgba(255, 209, 102, .14); border-color: var(--accent); color: var(--ink); }
+.chip:disabled { cursor: default; }
+.review { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 560px; text-align: start; }
+.rcat h3 { font-size: 15px; margin: 0 0 6px; color: var(--accent); }
+.rrow { display: grid; grid-template-columns: minmax(0, 6em) 1fr auto; gap: 8px; align-items: center; padding: 7px 10px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); margin-bottom: 4px; }
+.rrow .pn { font-weight: 700; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rrow .aw { font-weight: 800; overflow-wrap: anywhere; }
+.rrow.off .aw { text-decoration: line-through; color: var(--muted); }
+.rrow.empty .aw { color: var(--muted); font-weight: 600; font-style: italic; }
+.rrow .pt { font-weight: 800; color: var(--mint); min-width: 34px; text-align: end; }
+.rrow .pt.zero { color: var(--muted); }
+.veto { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 4px 10px; min-height: 32px; font-size: 12px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.veto[aria-pressed="true"] { border-color: var(--pink); color: var(--pink); background: rgba(255, 122, 138, .12); }
+.veto:disabled { opacity: .5; cursor: default; }
+.tag { font-size: 11px; font-weight: 800; color: var(--pink); }
+#stage > * { flex-shrink: 0; } /* long lists scroll; the letter and clock keep their shape */
+</style>
+
+<section class="screen" id="home" hidden>
+  <div class="panel">
+    <div>
+      <h1 class="logo"><span class="letter small" aria-hidden="true">ب</span>Letter Game</h1>
+      <p class="tagline" dir="auto">اسم، حيوان، نبات، جماد، بلاد. A letter comes up and everyone races to fill every category with a word that starts with it.</p>
+    </div>
+    <label class="eyebrow" for="hName">Your name</label>
+    <input class="input" id="hName" maxlength="14" autocomplete="nickname" placeholder="Type your name" dir="auto">
+    <div class="block">
+      <h3>Play with friends</h3>
+      <div id="onlineBox" class="row" style="flex-direction: column; align-items: stretch;">
+        <button class="btn primary" id="hCreate" type="button">Create a room</button>
+        <form class="row" id="joinForm">
+          <input class="input code-input grow" id="hCode" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" style="width:auto">
+          <button class="btn" id="hJoin" type="submit">Join room</button>
+        </form>
+        <button class="btn" id="hReopen" type="button" hidden>Reopen your room</button>
+      </div>
+      <p class="note" id="onlineNote" hidden>Online rooms work on the website, not inside this preview: <a href="https://libyan11.github.io/letter-game/" target="_blank" rel="noopener">libyan11.github.io/letter-game</a></p>
+    </div>
+    <div class="block">
+      <h3>Practise on your own</h3>
+      <p class="note">Beat the clock. You get a point for every box you fill with the right letter.</p>
+      <button class="btn" id="hSolo" type="button">Practise</button>
+    </div>
+    <p class="msg" id="homeMsg" aria-live="polite"></p>
+    <div class="row"><button class="ghost" id="hRules" type="button">Rules</button></div>
+  </div>
+</section>
+
+<section class="screen" id="lobby" hidden>
+  <div class="panel">
+    <div>
+      <p class="eyebrow">Room code</p>
+      <div class="room-code" id="lCode">····</div>
+      <p class="note" id="lNet">Opening room…</p>
+    </div>
+    <div class="share">
+      <code id="lLink"></code>
+      <button class="ghost" id="lCopy" type="button">Copy link</button>
+    </div>
+    <p class="note" id="lCopyMsg" aria-live="polite"></p>
+    <div class="block">
+      <h3 id="lCount">Players</h3>
+      <ul class="plist" id="lPlayers"></ul>
+    </div>
+    <div class="block">
+      <h3>Settings</h3>
+      <div id="lSet"></div>
+      <button class="btn primary" id="lStart" type="button">Start game</button>
+      <p class="note" id="lNote"></p>
+    </div>
+    <div class="row"><button class="ghost" id="lRules" type="button">Rules</button><button class="ghost" id="lLeave" type="button">Leave room</button></div>
+  </div>
+</section>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand">
+      <h1>Letter Game</h1>
+      <p><span id="roundNo">Round 1</span> <span class="net" id="net"></span></p>
+    </div>
+    <div class="top-actions">
+      <button class="ghost" id="btnRules" type="button">Rules</button>
+      <button class="ghost" id="btnScores" type="button">Scores</button>
+      <button class="ghost" id="btnLeave" type="button">Leave</button>
+      <button class="ghost" id="btnMenu" type="button" aria-label="Menu: rules, scores, leave">Menu</button>
+    </div>
+  </header>
+  <section class="people" id="people" aria-label="Players and scores"></section>
+  <section class="stage" id="stage" aria-live="polite" style="justify-content:flex-start"></section>
+  <section class="act" id="act">
+    <div class="status" id="status"></div>
+    <div class="sub" id="sub"></div>
+    <div id="actMore"></div>
+  </section>
+  <details class="log" id="log">
+    <summary id="logLast">Game log</summary>
+    <ol id="logList" reversed></ol>
+  </details>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= constants & helpers ================= */
+const MAX_PLAYERS = 10, MIN_PLAYERS = 1, STOP_MS = 5000, REVIEW_MS = 75000, GRACE_MS = 1500;
+const LETTERS = {
+  ar: 'ابتجحخدرزسشصطعفقكلمنهوي'.split(''),
+  en: 'ABCDEFGHIJKLMNOPRSTW'.split('')
+};
+/* [key, English, Arabic] */
+const CATS = [
+  ['name', 'Name', 'اسم'], ['animal', 'Animal', 'حيوان'], ['plant', 'Plant', 'نبات'], ['thing', 'Thing', 'جماد'], ['country', 'Country', 'بلاد'],
+  ['food', 'Food', 'أكلة'], ['job', 'Job', 'مهنة'], ['city', 'City', 'مدينة'], ['colour', 'Colour', 'لون'], ['sport', 'Sport', 'رياضة'], ['body', 'Body part', 'عضو في الجسم']
+];
+const CAT = Object.fromEntries(CATS.map(c => [c[0], c]));
+const DEFAULT_OPTS = { lang: 'ar', cats: ['name', 'animal', 'plant', 'thing', 'country'], rounds: 5, time: 90 };
+const ROUNDS = [3, 5, 8, 10], TIMES = [60, 90, 120, 180];
+
+const LS = (() => { try { return window.localStorage; } catch (e) { return null; } })();
+const SS = (() => { try { return window.sessionStorage; } catch (e) { return null; } })();
+function getItem(st, k) { try { const v = st && st.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+function setItem(st, k, v) { try { if (!st) return; if (v == null) st.removeItem(k); else st.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const rid = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function fixOpts(o) {
+  o = Object.assign({}, DEFAULT_OPTS, o || {});
+  o.lang = o.lang === 'en' ? 'en' : 'ar';
+  o.cats = (Array.isArray(o.cats) ? o.cats : []).filter(k => CAT[k]).slice(0, 8);
+  if (o.cats.length < 3) o.cats = DEFAULT_OPTS.cats.slice();
+  o.rounds = ROUNDS.includes(+o.rounds) ? +o.rounds : 5;
+  o.time = TIMES.includes(+o.time) ? +o.time : 90;
+  return o;
+}
+function catName(k, lang) { return lang === 'en' ? CAT[k][1] : CAT[k][2]; }
+/* compare answers without caring about case, accents, Arabic vowel marks or "al-"/"the" */
+function norm(s) {
+  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[ً-ٰٟـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي')
+    .replace(/^(the|a|an)\s+/, '').replace(/^ال(?=..)/, '').replace(/[^a-z0-9؀-ۿ]/g, '');
+}
+function startsRight(ans, letter) {
+  const n = norm(ans);
+  if (!n) return false;
+  const l = norm(letter) || letter.toLowerCase();
+  if (n[0] === l) return true;
+  /* Arabic: a word may begin with ال before the letter; and ا covers أ إ آ */
+  const raw = String(ans).trim().replace(/[ً-ٟ]/g, '').replace(/[أإآٱ]/g, 'ا');
+  return raw.startsWith(letter) || raw.startsWith('ال' + letter);
+}
+function cleanAns(s) { return String(s || '').replace(/\s+/g, ' ').trim().slice(0, 30); }
+
+const me = (() => { let id = getItem(SS, 'lg-id'); if (!id) { id = rid(); setItem(SS, 'lg-id', id); } return id; })();
+let myName = getItem(LS, 'lg-name') || '';
+const onlineOK = !/claude|anthropic/i.test(location.hostname) && location.protocol !== 'data:';
+
+let role = null, roomCode = '', S = null, V = null, timer = null, token = 0;
+let pickFor = '', shownOver = null, homeMsg = '', homeErr = false;
+let roomOpts = fixOpts(getItem(LS, 'lg-opts'));
+let localDeadline = 0, clockIv = 0;
+let draft = {}, draftFor = '', sendT = 0;
+
+/* ================= game engine (runs on the host / solo device) ================= */
+function newPlayer(id, name) { return { id, name, online: true, score: 0, wins: 0, last: 0 }; }
+function idxOf(pid) { return S.players.findIndex(p => p.id === pid); }
+function addLog(t) { S.log.push(t); if (S.log.length > 80) S.log.shift(); }
+function present(i) { const p = S.players[i]; return p && p.online; }
+function baseState(mode, opts) {
+  return { v: 1, mode, hostId: me, players: [], waiting: [], phase: 'lobby', opts: fixOpts(opts), game: 0, round: 0, letter: '', usedLetters: [],
+    ans: {}, deadline: 0, stopBy: -1, vetoes: {}, result: null, log: [] };
+}
+function seatWaiting() {
+  while (S.waiting.length && S.players.length < MAX_PLAYERS) { const w = S.waiting.shift(); const p = newPlayer(w.id, w.name); p.online = w.online !== false; S.players.push(p); }
+}
+function schedule(fn, ms) { clearTimeout(timer); const t = token; timer = setTimeout(() => { if (t === token) fn(); }, ms); }
+function newGame() {
+  seatWaiting();
+  S.game++; S.round = 0; S.usedLetters = [];
+  S.players.forEach(p => { p.score = 0; p.last = 0; });
+  addLog(`Game ${S.game} starts: ${S.opts.rounds} letters.`);
+  newRound();
+}
+function newRound() {
+  token++; clearTimeout(timer);
+  seatWaiting();
+  S.round++;
+  const pool = LETTERS[S.opts.lang].filter(l => !S.usedLetters.includes(l));
+  S.letter = pool[Math.floor(Math.random() * pool.length)];
+  S.usedLetters.push(S.letter);
+  S.ans = {}; S.vetoes = {}; S.result = null; S.stopBy = -1;
+  S.players.forEach((p, i) => { S.ans[i] = {}; });
+  S.phase = 'write';
+  S.deadline = Date.now() + S.opts.time * 1000;
+  addLog(`Round ${S.round}: the letter is ${S.letter}.`);
+  step();
+}
+function step() {
+  changed();
+  if (S.phase === 'write') schedule(() => { if (S.phase === 'write') lockIn(); }, Math.max(0, S.deadline - Date.now()));
+  else if (S.phase === 'collect') schedule(() => { if (S.phase === 'collect') toReview(); }, GRACE_MS);
+  else if (S.phase === 'review') schedule(() => { if (S.phase === 'review') score(); }, Math.max(0, S.deadline - Date.now()));
+}
+function fill(pi, data) {
+  if (pi < 0 || (S.phase !== 'write' && S.phase !== 'collect') || !data || typeof data !== 'object') return;
+  const a = {};
+  S.opts.cats.forEach(k => { if (data[k] != null) a[k] = cleanAns(data[k]); });
+  S.ans[pi] = a;
+}
+function full(pi) { return S.opts.cats.every(k => S.ans[pi] && cleanAns(S.ans[pi][k])); }
+function stop(pi) {
+  if (S.phase !== 'write' || S.stopBy >= 0 || !full(pi)) return;
+  S.stopBy = pi;
+  S.deadline = Math.min(S.deadline, Date.now() + STOP_MS);
+  addLog(`${S.players[pi].name} shouted STOP!`);
+  step();
+}
+function lockIn() { token++; clearTimeout(timer); S.phase = 'collect'; step(); }
+function toReview() {
+  token++; clearTimeout(timer);
+  if (S.players.length === 1) { score(); return; }
+  S.phase = 'review';
+  S.deadline = Date.now() + REVIEW_MS;
+  step();
+}
+function veto(pi, target, cat, on) {
+  if (S.phase !== 'review' || pi < 0 || target === pi || !S.opts.cats.includes(cat) || !S.players[target]) return;
+  const key = target + ':' + cat;
+  const list = (S.vetoes[key] || []).filter(x => x !== pi);
+  if (on) list.push(pi);
+  S.vetoes[key] = list;
+  changed();
+}
+function judges(target) { return S.players.map((p, i) => i).filter(i => i !== target && present(i)); }
+function vetoed(target, cat) { const v = (S.vetoes[target + ':' + cat] || []).filter(i => present(i)); const j = judges(target).length; return j > 0 && v.length * 2 > j; }
+/* 10 for an answer nobody else had, 5 if someone else wrote the same, 0 if empty, wrong letter or voted out. Practice: 1 per right box. */
+function score() {
+  token++; clearTimeout(timer);
+  const res = {};
+  S.players.forEach((p, i) => { res[i] = {}; });
+  S.opts.cats.forEach(k => {
+    const ok = S.players.map((p, i) => i).filter(i => { const a = S.ans[i] && S.ans[i][k]; return a && startsRight(a, S.letter) && !vetoed(i, k); });
+    ok.forEach(i => {
+      const n = norm(S.ans[i][k]);
+      const same = ok.filter(j => j !== i && norm(S.ans[j][k]) === n).length;
+      res[i][k] = S.players.length === 1 ? 1 : same ? 5 : 10;
+    });
+  });
+  S.players.forEach((p, i) => { p.last = S.opts.cats.reduce((s, k) => s + (res[i][k] || 0), 0); p.score += p.last; });
+  S.result = res;
+  S.phase = S.round >= S.opts.rounds ? 'over' : 'scored';
+  if (S.phase === 'over') {
+    const top = Math.max(...S.players.map(p => p.score));
+    if (S.players.length > 1) S.players.forEach(p => { if (p.score === top) p.wins++; });
+    addLog(`Game over! ${S.players.filter(p => p.score === top).map(p => p.name).join(' and ')} wins with ${top}.`);
+  }
+  step();
+}
+function handleAct(pid, act, data) {
+  if (!S) return;
+  data = data || {};
+  const pi = idxOf(pid);
+  const isHost = pid === S.hostId;
+  if (act === 'fill') { fill(pi, data.a); return; }
+  if (act === 'stop') { fill(pi, data.a); stop(pi); return; }
+  if (act === 'veto') { veto(pi, +data.t, String(data.k), !!data.on); return; }
+  if (!isHost) return;
+  if (act === 'remove') {
+    if (S.phase !== 'lobby' || data.id === S.hostId) return;
+    const i = idxOf(data.id); if (i < 0) return;
+    S.players.splice(i, 1);
+    conns.forEach(c => { if (c.pid === data.id) { try { c.send({ t: 'kicked' }); } catch (e) { /* gone */ } } });
+    changed();
+  } else if (act === 'settings') { if (S.phase !== 'lobby') return; S.opts = fixOpts(data); changed(); }
+  else if (act === 'start') { if (S.phase !== 'lobby' || S.players.length < MIN_PLAYERS) return; newGame(); }
+  else if (act === 'score') { if (S.phase === 'review') score(); }
+  else if (act === 'next') { if (S.phase === 'scored') newRound(); else if (S.phase === 'over') newGame(); }
+  else if (act === 'lobby') { if (S.phase !== 'over') return; seatWaiting(); S.phase = 'lobby'; changed(); }
+}
+/* while writing you only see how many boxes the others have filled */
+function viewFor(pid) {
+  const idx = S.players.findIndex(p => p.id === pid);
+  const writing = S.phase === 'write' || S.phase === 'collect';
+  const v = JSON.parse(JSON.stringify({ mode: S.mode, phase: S.phase, opts: S.opts, game: S.game, round: S.round, letter: S.letter, stopBy: S.stopBy,
+    result: S.result, log: S.log, hostId: S.hostId, waiting: S.waiting.map(w => w.name) }));
+  v.me = idx;
+  v.left = S.phase === 'write' || S.phase === 'review' ? Math.max(0, S.deadline - Date.now()) : 0;
+  v.players = S.players.map((p, i) => ({ id: p.id, name: p.name, online: p.online, score: p.score, last: p.last, wins: p.wins,
+    filled: S.opts.cats.filter(k => S.ans[i] && cleanAns(S.ans[i][k])).length }));
+  v.ans = writing ? { [idx]: S.ans[idx] || {} } : JSON.parse(JSON.stringify(S.ans));
+  v.vetoes = {};
+  Object.keys(S.vetoes).forEach(k => { v.vetoes[k] = { n: S.vetoes[k].length, mine: S.vetoes[k].includes(idx), out: vetoed(+k.split(':')[0], k.split(':')[1]) }; });
+  return v;
+}
+/* Game Night: who placed where when a match ends (null while it is still going) */
+function nightRank() {
+  if (S.phase !== 'over') return null;
+  const d = [...new Set(S.players.map(p => p.score))].sort((a, b) => b - a);
+  return S.players.map(p => ({ name: p.name, place: d.indexOf(p.score) }));
+}
+function changed() {
+  if (role === 'host') broadcast();
+  if (role === 'host' && window.GN) GN.report(nightRank());
+  if (role === 'host' || role === 'solo') {
+    V = viewFor(me);
+    if (role === 'solo') setItem(LS, 'lg-solo', S);
+    else setItem(LS, 'lg-host', { code: roomCode, S });
+  }
+  render();
+}
+
+/* ================= networking (host-authoritative rooms) =================
+   A direct phone-to-phone link (PeerJS) is tried first. Public MQTT relays carry the same
+   messages as a backup when a network blocks the direct link. */
+const PEER_PREFIX = 'gamenight-letters-room-';
+const RELAYS = [
+  ['wss://public.cloud.shiftr.io:443', { username: 'public', password: 'public' }],
+  ['wss://broker.hivemq.com:8884/mqtt', {}],
+  ['wss://broker.emqx.io:8084/mqtt', {}]
+];
+const RELAY_ROOT = 'gamenight-letters-v1/';
+let peer = null, hostConn = null, link = null, everConnected = false;
+const conns = new Set(), relayConns = new Map();
+let stateSeq = 0, hostSess = '', lastState = { hs: null, sv: 0 };
+let fallbackTimer = 0, giveUpTimer = 0, retryTimer = 0, helloIv = 0, beatIv = 0, lastHostMsg = 0;
+const relay = { clients: [], seq: 0, sess: '', seen: new Map() };
+
+function netReady() { return typeof Peer !== 'undefined' || typeof mqtt !== 'undefined'; }
+let netWait = false;
+function waitNet(fn) { if (window.NET_DONE) return false; if (!netWait) { netWait = true; NET.then(() => { netWait = false; fn(); }); } return true; }
+function newCode() { const a = 'ABCDEFGHJKMNPQRSTUVWXYZ'; let c = ''; for (let i = 0; i < 4; i++) c += a[Math.floor(Math.random() * a.length)]; return c; }
+function peerIdFor(code) { return PEER_PREFIX + code.toLowerCase(); }
+function roomTopic(rest) { return 'room/' + roomCode.toLowerCase() + '/' + rest; }
+let netText = '', netWarn = false;
+function setNet(text, warn) { netText = text || ''; netWarn = !!warn; renderNet(); }
+
+function relayStart(listen, onMsg) {
+  relayStop();
+  if (typeof mqtt === 'undefined') return;
+  relay.sess = Math.random().toString(36).slice(2, 8);
+  const topic = RELAY_ROOT + listen;
+  relay.clients = RELAYS.map(([url, o]) => {
+    let c;
+    try { c = mqtt.connect(url, Object.assign({}, o, { clientId: 'lg-' + me + '-' + Math.random().toString(36).slice(2, 6), connectTimeout: 10000, reconnectPeriod: 4000, keepalive: 30 })); }
+    catch (e) { return null; }
+    c.on('connect', () => c.subscribe(topic));
+    c.on('message', (t, buf) => {
+      let env; try { env = JSON.parse(buf.toString()); } catch (e) { return; }
+      if (!env || !env.id || env.f === me || relay.seen.has(env.id)) return;
+      relay.seen.set(env.id, 1);
+      if (relay.seen.size > 600) relay.seen.delete(relay.seen.keys().next().value);
+      onMsg(env.m, String(env.f || ''));
+    });
+    c.on('error', () => {});
+    return c;
+  }).filter(Boolean);
+}
+function relaySend(to, m) {
+  const env = JSON.stringify({ f: me, id: me + '.' + relay.sess + '.' + (++relay.seq), m });
+  relay.clients.forEach(c => { if (c.connected) { try { c.publish(RELAY_ROOT + to, env); } catch (e) { /* skip */ } } });
+}
+function relayStop() {
+  relay.clients.forEach(c => { try { c.end(true); } catch (e) { /* skip */ } });
+  relay.clients = []; relay.seen.clear();
+}
+
+/* ---- host ---- */
+function broadcast() {
+  const sv = ++stateSeq;
+  conns.forEach(c => { if (c.open && c.pid) { try { c.send({ t: 'state', v: viewFor(c.pid), hs: hostSess, sv }); } catch (e) { /* dropped */ } } });
+}
+function startHostRelay() {
+  relayConns.clear();
+  relayStart(roomTopic('host'), (m, f) => {
+    if (role !== 'host' || !m || !f) return;
+    let c = relayConns.get(f);
+    if (!c) {
+      if (m.t !== 'hello') return;
+      c = { relay: true, from: f, pid: null, open: true, seen: 0, send: x => relaySend(roomTopic('g/' + f), x), close() { this.open = false; } };
+      relayConns.set(f, c);
+    }
+    c.seen = Date.now();
+    if (m.t !== 'ping') hostReceive(c, m);
+  });
+  clearInterval(beatIv);
+  /* every guest pings every 5s; anyone silent for 15-20s is treated as gone, and the computer covers their turns */
+  beatIv = setInterval(() => {
+    const now = Date.now();
+    relayConns.forEach((c, f) => { if (now - c.seen > 20000) { relayConns.delete(f); c.open = false; hostDrop(c); } });
+    conns.forEach(c => {
+      if (!c.relay && c.seen && now - c.seen > 15000) { try { c.close(); } catch (e) { /* skip */ } hostDrop(c); }
+      else { try { c.send({ t: 'ping' }); } catch (e) { /* skip */ } }
+    });
+  }, 5000);
+}
+function openHostPeer(attempt) {
+  attempt = attempt || 0;
+  if (typeof Peer === 'undefined') { setNet('Room open · backup link'); return; }
+  setNet('Opening room…', true);
+  peer = new Peer(peerIdFor(roomCode), { debug: 1 });
+  peer.on('open', () => setNet('Room open'));
+  peer.on('connection', c => {
+    c.on('data', m => hostReceive(c, m));
+    c.on('close', () => hostDrop(c));
+    c.on('error', () => hostDrop(c));
+  });
+  peer.on('disconnected', () => { setNet('Reconnecting…', true); setTimeout(() => { try { if (peer && !peer.destroyed) peer.reconnect(); } catch (e) { /* skip */ } }, 1500); });
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id' && attempt < 12) {
+      setNet('Reopening room…', true);
+      try { peer.destroy(); } catch (x) { /* skip */ }
+      setTimeout(() => { if (role === 'host') openHostPeer(attempt + 1); }, 3000);
+    } else if (e.type !== 'peer-unavailable') setNet('Connection problem (' + e.type + ')', true);
+  });
+}
+function hostReceive(c, m) {
+  if (!m || typeof m !== 'object' || !S) return;
+  c.seen = Date.now();
+  if (m.t === 'ping') return;
+  if (m.t === 'away' && c.pid) {
+    conns.delete(c);
+    const p = S.players.find(x => x.id === c.pid);
+    if (p) p.online = false;
+    const w = S.waiting.find(x => x.id === c.pid);
+    if (w) w.online = false;
+    afterPresence();
+    return;
+  }
+  if (m.t === 'hello') {
+    const pid = String(m.cid || '').slice(0, 24);
+    if (!pid || pid === S.hostId) { try { c.close(); } catch (e) { /* skip */ } return; }
+    const name = String(m.name || '').trim().slice(0, 14) || 'Player';
+    c.pid = pid; conns.add(c);
+    let p = S.players.find(x => x.id === pid);
+    if (!p) {
+      p = S.players.find(x => !x.bot && !x.online && x.id !== S.hostId && x.name.toLowerCase() === name.toLowerCase());
+      if (p) p.id = pid;
+    }
+    if (p) { p.name = name; p.online = true; afterPresence(); return; }
+    const w = S.waiting.find(x => x.id === pid);
+    if (w) { w.name = name; w.online = true; changed(); return; }
+    if (S.phase === 'lobby') {
+      if (S.players.length < MAX_PLAYERS) S.players.push(newPlayer(pid, name, false));
+      else {
+        const b = S.players.map(x => x.bot).lastIndexOf(true);
+        if (b < 0) { try { c.send({ t: 'full' }); } catch (e) { /* skip */ } conns.delete(c); return; }
+        S.players[b] = newPlayer(pid, name, false);
+      }
+    } else S.waiting.push({ id: pid, name, online: true });
+    addLog(`${name} joined the room.`);
+    changed();
+    return;
+  }
+  if (m.t === 'bye' && c.pid) {
+    const i = idxOf(c.pid);
+    if (S.phase === 'lobby' && i >= 0) S.players.splice(i, 1);
+    S.waiting = S.waiting.filter(w => w.id !== c.pid);
+    conns.delete(c);
+    if (S.phase !== 'lobby' && i >= 0 && S.players[i] && S.players[i].id === c.pid) { S.players[i].online = false; afterPresence(); return; }
+    changed();
+    return;
+  }
+  if (m.t === 'act' && c.pid) handleAct(c.pid, String(m.act), m.data);
+}
+function hostDrop(c) {
+  if (!conns.has(c)) return;
+  conns.delete(c);
+  if (c.pid && ![...conns].some(x => x.pid === c.pid)) {
+    const p = S && S.players.find(x => x.id === c.pid);
+    if (p) p.online = false;
+    const w = S && S.waiting.find(x => x.id === c.pid);
+    if (w) w.online = false;
+    afterPresence();
+  }
+}
+function afterPresence() {
+  if (!S) return;
+  step();
+}
+function normalizeHost() {
+  S.players.forEach(p => { if (!p.bot) p.online = p.id === me; });
+  S.waiting.forEach(w => { w.online = false; });
+  token++; clearTimeout(timer);
+  if (S.phase !== 'lobby') step();
+}
+
+/* ---- guest ---- */
+function joinRoom(code) {
+  role = 'guest'; roomCode = code; V = null; everConnected = false; link = null; lastState = { hs: null, sv: 0 };
+  homeMsg = 'Connecting to room ' + code + '…'; homeErr = false;
+  render();
+  setNet('Connecting…', true);
+  relayStart(roomTopic('g/' + me), guestRelayMsg);
+  clearTimeout(fallbackTimer); fallbackTimer = setTimeout(useRelay, 4000);
+  clearTimeout(giveUpTimer);
+  giveUpTimer = setTimeout(() => {
+    if (role === 'guest' && !everConnected) leave(`Couldn't reach room ${code}. Check the code, and that the host still has the game open.`);
+  }, 25000);
+  clearInterval(beatIv);
+  beatIv = setInterval(() => {
+    if (role !== 'guest' || !link || !hostConn) return;
+    try { hostConn.send({ t: 'ping' }); } catch (e) { /* skip */ }
+    if (Date.now() - lastHostMsg > 16000) {
+      setNet('Lost the host. Reconnecting…', true);
+      if (link === 'relay') hostConn.send({ t: 'hello', cid: me, name: myName });
+      else { link = null; hostConn = null; lastHostMsg = Date.now(); retryLater(); useRelay(); }
+    }
+  }, 5000);
+  if (typeof Peer === 'undefined') { useRelay(); return; }
+  peer = new Peer({ debug: 1 });
+  peer.on('open', connectHost);
+  peer.on('disconnected', () => { setTimeout(() => { try { if (peer && !peer.destroyed) peer.reconnect(); } catch (e) { /* skip */ } }, 1500); });
+  peer.on('error', e => {
+    if (link === 'relay') return;
+    useRelay();
+    setNet(e.type === 'peer-unavailable' ? (everConnected ? 'Host not reachable. Retrying…' : 'Trying another way to reach the room…') : 'Connection problem. Retrying…', true);
+    retryLater();
+  });
+}
+function linked(how) {
+  everConnected = true; link = how; clearTimeout(giveUpTimer); lastHostMsg = Date.now();
+  setNet('Connected' + (how === 'relay' ? ' · backup link' : ''));
+  setItem(LS, 'lg-guest', { code: roomCode });
+}
+function useRelay() {
+  if (role !== 'guest' || link === 'peer' || helloIv) return;
+  const hello = () => {
+    if (role !== 'guest' || link) { clearInterval(helloIv); helloIv = 0; return; }
+    relaySend(roomTopic('host'), { t: 'hello', cid: me, name: myName });
+  };
+  helloIv = setInterval(hello, 2000); hello();
+}
+function relayHostConn() { return { relay: true, open: true, send: m => relaySend(roomTopic('host'), m) }; }
+function guestRelayMsg(m) {
+  if (role !== 'guest' || !m) return;
+  lastHostMsg = Date.now();
+  if (m.t !== 'state' && m.t !== 'full' && m.t !== 'kicked' && m.t !== 'closed') return;
+  if (m.t === 'state' && link !== 'peer' && link !== 'relay') { hostConn = relayHostConn(); linked('relay'); }
+  else if (link === 'relay') setNet('Connected · backup link');
+  if (link === 'relay' || m.t !== 'state') guestMsg(m);
+}
+function guestMsg(m) {
+  if (!m) return;
+  if (m.t === 'full') { leave('That room is full. Rooms hold 10 players.'); return; }
+  if (m.t === 'kicked') { leave('The host removed you from the room.'); return; }
+  if (m.t === 'closed') { leave('The host closed the room.'); return; }
+  if (m.t !== 'state') return;
+  if (m.hs === lastState.hs && m.sv <= lastState.sv) return;
+  lastState = { hs: m.hs, sv: m.sv };
+  V = m.v;
+  render();
+}
+function connectHost() {
+  if (!peer || peer.destroyed || role !== 'guest') return;
+  const c = peer.connect(peerIdFor(roomCode), { reliable: true });
+  if (!link) hostConn = c;
+  c.on('open', () => { hostConn = c; c.send({ t: 'hello', cid: me, name: myName }); linked('peer'); });
+  c.on('data', m => { if (link === 'peer' && hostConn === c) { lastHostMsg = Date.now(); guestMsg(m); } });
+  c.on('close', () => {
+    if (role === 'guest' && hostConn === c) { link = null; hostConn = null; setNet('Lost the host. Reconnecting…', true); retryLater(); useRelay(); }
+  });
+}
+function retryLater() {
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => {
+    if (!peer || peer.destroyed || role !== 'guest') return;
+    if (peer.disconnected) { try { peer.reconnect(); } catch (e) { /* skip */ } setTimeout(connectHost, 1500); }
+    else connectHost();
+  }, 2500);
+}
+
+/* ---- shared ---- */
+function act(name, data) {
+  if (role === 'guest') { if (hostConn && hostConn.open) hostConn.send({ t: 'act', act: name, data }); }
+  else if (S) handleAct(me, name, data);
+}
+
+function leave(msg) {
+  if (role === 'guest' && hostConn && hostConn.open) { try { hostConn.send({ t: 'bye' }); } catch (e) { /* skip */ } }
+  if (role === 'host') conns.forEach(c => { try { c.send({ t: 'closed' }); } catch (e) { /* skip */ } });
+  token++; clearTimeout(timer);
+  clearTimeout(retryTimer); clearTimeout(fallbackTimer); clearTimeout(giveUpTimer); clearInterval(helloIv); clearInterval(beatIv); helloIv = 0;
+  const p = peer; setTimeout(() => { try { p && p.destroy(); } catch (e) { /* skip */ } }, 300);
+  setTimeout(relayStop, 300);
+  relayConns.clear(); conns.clear(); link = null; peer = null; hostConn = null;
+  if (role === 'host') setItem(LS, 'lg-host', null);
+  if (role === 'guest') setItem(LS, 'lg-guest', null);
+  role = null; S = null; V = null; roomCode = ''; pickFor = ''; shownOver = null;
+  homeMsg = msg || ''; homeErr = !!msg;
+  setNet('');
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  closeModal();
+  render();
+}
+
+/* ================= rendering ================= */
+function isRoomHost() { return role === 'host' || role === 'solo'; }
+function myTurn() { return !!(V && V.phase === 'write' && V.me >= 0); }
+function render() {
+  const screen = !role || (role === 'guest' && !V) ? 'home' : V && V.phase === 'lobby' ? 'lobby' : 'game';
+  if (screen !== 'game') document.title = 'Letter Game · Game Night';
+  $('home').hidden = screen !== 'home';
+  $('lobby').hidden = screen !== 'lobby';
+  $('app').hidden = screen !== 'game';
+  if (screen === 'home') renderHome(); else if (screen === 'lobby') renderLobby(); else renderGame();
+}
+function renderNet() {
+  const el = $('net');
+  el.textContent = role === 'host' || role === 'guest' ? `· Room ${roomCode} · ${netText}` : '';
+  el.className = 'net' + (netWarn ? ' warn' : '');
+  $('lNet').textContent = netText || ' ';
+}
+function renderHome() {
+  if (document.activeElement !== $('hName') && !$('hName').value) $('hName').value = myName;
+  $('onlineBox').hidden = !onlineOK;
+  $('onlineNote').hidden = onlineOK;
+  const savedHost = getItem(LS, 'lg-host');
+  $('hReopen').hidden = !(savedHost && savedHost.code && role !== 'guest');
+  if (savedHost && savedHost.code) $('hReopen').textContent = `Reopen your room ${savedHost.code}`;
+  $('hCreate').disabled = $('hJoin').disabled = role === 'guest';
+  const m = $('homeMsg'); m.textContent = homeMsg; m.className = 'msg' + (homeErr ? ' err' : '');
+}
+function settingsHTML(o, edit) {
+  const dis = edit ? '' : ' disabled';
+  return `<p class="eyebrow">Language</p><div class="sets"><button class="chip" type="button" data-lang="ar" aria-pressed="${o.lang === 'ar'}"${dis}>العربية</button><button class="chip" type="button" data-lang="en" aria-pressed="${o.lang === 'en'}"${dis}>English</button></div>
+    <p class="eyebrow" style="margin-top:10px">Categories (3 to 8)</p><div class="sets"${o.lang === 'ar' ? ' dir="rtl"' : ''}>${CATS.map(c => `<button class="chip" type="button" data-cat="${c[0]}" aria-pressed="${o.cats.includes(c[0])}"${dis}>${esc(catName(c[0], o.lang))}</button>`).join('')}</div>
+    <div class="set-row" style="margin-top:10px"><label>Rounds <select class="input" data-opt="rounds"${dis}>${ROUNDS.map(n => `<option value="${n}"${o.rounds === n ? ' selected' : ''}>${n} letters</option>`).join('')}</select></label>
+    <label>Time per letter <select class="input" data-opt="time"${dis}>${TIMES.map(n => `<option value="${n}"${o.time === n ? ' selected' : ''}>${n < 120 ? n + ' seconds' : n / 60 + ' minutes'}</option>`).join('')}</select></label></div>`;
+}
+function shareLink() { return location.origin + location.pathname + '#' + roomCode; }
+function renderLobby() {
+  renderNet();
+  $('lCode').textContent = roomCode;
+  $('lLink').textContent = shareLink();
+  $('lCopy').textContent = navigator.share ? 'Share link' : 'Copy link';
+  const host = role === 'host';
+  const n = V.players.length;
+  $('lCount').textContent = `Players (${n} of ${MAX_PLAYERS})`;
+  $('lPlayers').innerHTML = V.players.map(p => {
+    const tag = p.id === V.hostId ? 'Host' : p.online ? '' : 'Away';
+    const rm = host && p.id !== V.hostId ? `<button class="x" type="button" data-remove="${esc(p.id)}" aria-label="Remove ${esc(p.name)}">Remove</button>` : '';
+    return `<li><span class="dot ${p.online ? '' : 'off'}" aria-hidden="true"></span><span class="nm" dir="auto">${esc(p.name)}${p.id === me ? ' (you)' : ''}</span><span class="note">${tag}</span>${rm}</li>`;
+  }).join('') + (V.waiting.length ? `<li><span class="nm note">Waiting: ${esc(V.waiting.join(', '))}</span></li>` : '');
+  $('lSet').innerHTML = settingsHTML(V.opts, host);
+  $('lStart').hidden = !host;
+  $('lStart').disabled = n < 2;
+  $('lNote').textContent = host ? (n < 2 ? 'You need at least 2 players. Share the code with your friends.' : 'Ready when you are. More friends can still join with the code.') : 'Waiting for the host to start.';
+}
+let lastKey = '', lastPhase = '';
+function renderGame() {
+  if (!V) return;
+  renderNet();
+  if (V.phase !== 'over' && $('sheet').dataset.kind === 'results') closeModal();
+  $('roundNo').textContent = `Letter ${V.round} of ${V.opts.rounds}`;
+  if (V.phase === 'write' || V.phase === 'review') { localDeadline = Date.now() + V.left; if (!clockIv) clockIv = setInterval(drawClock, 250); }
+  else { clearInterval(clockIv); clockIv = 0; }
+  const key = V.game + '-' + V.round;
+  if (draftFor !== key) { draftFor = key; draft = {}; }
+  /* time is up: send the last words typed before the boxes lock */
+  if (V.phase === 'collect' && lastPhase === 'write') { if (document.querySelector('[data-field]')) collectDraft(); act('fill', { a: draft }); }
+  lastPhase = V.phase;
+  renderPeople(); renderStage(); renderAct(); renderLog();
+  document.title = myTurn() ? 'Write! · Letter Game' : 'Letter Game · Game Night';
+  if (V.phase === 'over' && shownOver !== V.game) { shownOver = V.game; setTimeout(() => { if (V && V.phase === 'over' && $('modal').hidden) openResults(); }, 2500); }
+}
+function renderPeople() {
+  const n = V.opts.cats.length;
+  $('people').innerHTML = V.players.map((p, i) => {
+    const t = V.phase === 'write' ? `${p.filled}/${n}` : !p.online ? 'Away' : V.phase === 'scored' || V.phase === 'over' ? `+${p.last}` : i === V.me ? 'You' : '';
+    return `<div class="who${V.phase === 'write' && p.filled === n ? ' done' : ''}${i === V.me ? ' me' : ''}"><span class="n" dir="auto">${esc(p.name)}</span><span class="s">${p.score}</span><span class="t">${t || '&nbsp;'}</span></div>`;
+  }).join('');
+}
+function drawClock() {
+  const el = $('clock');
+  if (!el || !V || !localDeadline) return;
+  const total = V.phase === 'review' ? REVIEW_MS : V.stopBy >= 0 ? STOP_MS : V.opts.time * 1000;
+  const left = Math.max(0, localDeadline - Date.now());
+  el.style.setProperty('--p', Math.min(1, left / total));
+  el.classList.toggle('low', left <= 10000);
+  el.querySelector('span').textContent = Math.ceil(left / 1000);
+}
+function collectDraft() { const a = {}; document.querySelectorAll('[data-field]').forEach(i => { a[i.dataset.field] = i.value; }); draft = a; return a; }
+function renderStage() {
+  const el = $('stage');
+  const lang = V.opts.lang;
+  const key = [V.game, V.round, V.phase, V.stopBy, V.phase === 'review' || V.phase === 'scored' || V.phase === 'over' ? JSON.stringify(V.vetoes) + JSON.stringify(V.result) : ''].join('|');
+  if (key === lastKey) { drawClock(); return; }
+  /* keep typed words and the focused box while the screen updates */
+  const focusK = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.field;
+  if (document.querySelector('[data-field]')) collectDraft();
+  lastKey = key;
+  const dir = lang === 'ar' ? ' dir="rtl"' : '';
+  if (V.phase === 'write' || V.phase === 'collect') {
+    const locked = V.phase !== 'write' || V.me < 0;
+    const fields = V.opts.cats.map(k => `<div class="field"${dir}><label for="f-${k}">${esc(catName(k, lang))}</label><input class="input" id="f-${k}" data-field="${k}" maxlength="30" autocomplete="off" autocapitalize="words" spellcheck="false" dir="auto" value="${esc(draft[k] || (V.ans[V.me] && V.ans[V.me][k]) || '')}"${locked ? ' disabled' : ''}></div>`).join('');
+    el.innerHTML = `<div class="letter" aria-label="The letter is ${esc(V.letter)}">${esc(V.letter)}</div>${V.stopBy >= 0 ? `<div class="stop-banner">${esc(V.players[V.stopBy].name)} said STOP!</div>` : ''}${V.phase === 'write' ? '<div class="clock" id="clock"><span></span></div>' : ''}<div class="fields">${fields}</div>`;
+    markFields();
+    if (focusK && $('f-' + focusK)) { const f = $('f-' + focusK); f.focus(); const L = f.value.length; try { f.setSelectionRange(L, L); } catch (e) { /* skip */ } }
+    drawClock();
+    return;
+  }
+  /* review and results: every answer, by category */
+  const scored = V.phase !== 'review';
+  const cats = V.opts.cats.map(k => {
+    const rows = V.players.map((p, i) => {
+      const a = (V.ans[i] && V.ans[i][k]) || '';
+      const right = a && startsRight(a, V.letter);
+      const vk = V.vetoes[i + ':' + k] || { n: 0, mine: false, out: false };
+      const off = a && (!right || vk.out);
+      const pts = scored && V.result ? V.result[i][k] || 0 : null;
+      const canVeto = !scored && a && right && i !== V.me && V.me >= 0;
+      return `<div class="rrow${!a ? ' empty' : off ? ' off' : ''}"><span class="pn" dir="auto">${esc(p.name)}</span><span class="aw" dir="auto">${a ? esc(a) : '—'}${a && !right ? ' <span class="tag">wrong letter</span>' : vk.out ? ' <span class="tag">voted out</span>' : ''}</span>${
+        pts != null ? `<span class="pt${pts ? '' : ' zero'}">${pts ? '+' + pts : '0'}</span>` : canVeto ? `<button class="veto" type="button" data-veto="${i}" data-k="${k}" aria-pressed="${vk.mine}">✗ ${vk.n || ''}</button>` : `<span class="pt zero">${vk.n ? '✗ ' + vk.n : ''}</span>`}</div>`;
+    }).join('');
+    return `<div class="rcat"><h3${dir}>${esc(catName(k, lang))}</h3>${rows}</div>`;
+  }).join('');
+  el.innerHTML = `<div class="letter small">${esc(V.letter)}</div>${V.phase === 'review' ? '<div class="clock" id="clock"><span></span></div>' : ''}<div class="review">${cats}</div>`;
+  drawClock();
+}
+function markFields() {
+  document.querySelectorAll('[data-field]').forEach(i => { const v = i.value.trim(); i.classList.toggle('good', !!v && startsRight(v, V.letter)); i.classList.toggle('bad', !!v && !startsRight(v, V.letter)); });
+}
+function myFull() { return V.opts.cats.every(k => cleanAns(draft[k])); }
+function renderAct() {
+  const host = isRoomHost();
+  let status = '', sub = '', more = '';
+  if (V.phase === 'write') {
+    if (V.me < 0) { status = 'Everyone is writing.'; sub = 'You join next round.'; }
+    else if (V.stopBy >= 0) { status = 'Quick! Finish your words.'; sub = 'The round ends in a few seconds.'; }
+    else { status = `Words starting with ${V.letter}`; sub = 'Fill every box, then shout STOP to give everyone 5 seconds.'; more = `<div class="actions"><button class="btn stop-btn" type="button" id="aStop"${myFull() ? '' : ' disabled'}>STOP!</button></div>`; }
+  } else if (V.phase === 'collect') { status = 'Pens down!'; sub = 'Collecting everyone\'s words…'; }
+  else if (V.phase === 'review') {
+    status = 'Check the answers.'; sub = 'Tap ✗ on an answer that doesn\'t count. If more than half of the others agree, it scores nothing.';
+    if (host) more = '<div class="actions"><button class="btn primary" type="button" id="aScore">Count the points</button></div>';
+  } else if (V.phase === 'scored') {
+    const mine = V.players[V.me];
+    status = mine ? `You scored ${mine.last} this round.` : 'Round scored.';
+    sub = host ? 'Next letter when everyone is ready.' : 'The host starts the next letter.';
+    if (host) more = '<div class="actions"><button class="btn primary" type="button" id="aNext">Next letter</button></div>';
+  } else if (V.phase === 'over') {
+    const top = Math.max(...V.players.map(p => p.score));
+    const w = V.players.filter(p => p.score === top);
+    status = V.players.length === 1 ? `Practice done: ${top} points.` : w.some(p => p.id === me) ? (w.length > 1 ? 'You share the win!' : 'You win!') : `${w.map(p => p.name).join(' and ')} win${w.length > 1 ? '' : 's'}!`;
+    sub = `${V.opts.rounds} letters played.`;
+    more = `<div class="actions"><button class="btn" type="button" id="aResults">Results</button>${host ? '<button class="btn primary" type="button" id="aNew">Play again</button>' : ''}</div>`;
+  }
+  $('act').classList.toggle('mine', myTurn());
+  $('status').textContent = status;
+  $('sub').textContent = sub;
+  $('actMore').innerHTML = more;
+}
+function renderLog() {
+  const log = V.log || [];
+  $('logLast').textContent = log.length ? log[log.length - 1] : 'Game log';
+  $('logList').innerHTML = log.slice().reverse().map(t => `<li dir="auto">${esc(t)}</li>`).join('');
+  $('logList').setAttribute('start', log.length);
+}
+
+/* ================= modals ================= */
+function openModal(html, kind) { $('sheet').innerHTML = html; $('sheet').dataset.kind = kind || ''; $('modal').hidden = false; const f = $('sheet').querySelector('button, input, select'); if (f && kind !== 'results') f.focus(); }
+function closeModal() { $('modal').hidden = true; $('sheet').innerHTML = ''; $('sheet').dataset.kind = ''; }
+function openRules() {
+  openModal(`<h2>How to <span>play</span></h2>
+  <p class="lede" dir="auto">اسم، حيوان، نبات، جماد، بلاد: the classic letter game.</p>
+  <ul class="rules">
+    <li><b>The letter.</b> Each round a letter comes up. Fill every category with a word starting with it: a name, an animal, a plant, a thing, a country, and any others the host chose.</li>
+    <li><b>STOP!</b> When all your boxes are filled you can shout STOP. Everyone else gets 5 more seconds. Or the clock runs out.</li>
+    <li><b>Checking.</b> Everyone sees all the answers. Tap ✗ on an answer you think doesn't count. If more than half of the other players tap it, it scores nothing. Answers with the wrong first letter never count.</li>
+    <li><b>Points.</b> 10 for a good answer nobody else had. 5 if someone else wrote the same thing. 0 for empty, wrong or voted-out answers.</li>
+    <li><b>Arabic or English.</b> The host picks the language, the categories, how many letters and how long each one lasts. In Arabic, a word starting with ال still counts for the letter after it.</li>
+  </ul>
+  <div class="sheet-actions"><button class="btn primary" type="button" data-close>Got it</button></div>`);
+}
+function openResults() {
+  if (!V || V.phase !== 'over') return;
+  const order = V.players.map((p, i) => i).sort((a, b) => V.players[b].score - V.players[a].score);
+  const top = V.players[order[0]].score, winners = order.filter(i => V.players[i].score === top);
+  const host = isRoomHost();
+  const btns = host ? `<button class="btn" type="button" data-close>Look at the answers</button>${role === 'host' ? '<button class="btn" type="button" id="mLobby">Back to lobby</button>' : ''}<button class="btn primary" type="button" id="mNew">Play again</button>` : '<button class="btn primary" type="button" data-close>Close</button>';
+  openModal(`<h2>${V.players.length === 1 ? 'Practice <span>done</span>' : winners.includes(V.me) ? 'You <span>win!</span>' : esc(winners.map(i => V.players[i].name).join(' & ')) + ' <span>win' + (winners.length > 1 ? '' : 's') + '</span>'}</h2>
+    <p class="lede">After ${V.opts.rounds} letters.${host ? '' : ' The host starts the next game.'}</p>
+    <ol class="order">${order.map((i, k) => { const p = V.players[i]; return `<li class="${i === V.me ? 'me-row' : ''}"><span class="pl">${k + 1}</span><span class="nm" dir="auto">${esc(p.name)}</span><span class="pts">${p.score}<small>points</small></span></li>`; }).join('')}</ol>
+    <div class="sheet-actions">${btns}</div>`, 'results');
+}
+function openScores() {
+  if (!V) return;
+  const order = V.players.map((p, i) => i).sort((a, b) => V.players[b].score - V.players[a].score);
+  openModal(`<h2>Table <span>scores</span></h2><p class="lede">Points this game, and games won at this table.</p>
+    <ol class="order">${order.map((i, k) => { const p = V.players[i]; return `<li class="${i === V.me ? 'me-row' : ''}"><span class="pl">${k + 1}</span><span class="nm" dir="auto">${esc(p.name)}</span><span class="pts">${p.score}<small>${p.wins} win${p.wins === 1 ? '' : 's'}</small></span></li>`; }).join('')}</ol>
+    <div class="sheet-actions"><button class="btn primary" type="button" data-close>Close</button></div>`);
+}
+function openLeave() {
+  const msg = role === 'host' ? 'This closes the room for everyone in it.' : role === 'guest' ? 'You can rejoin with the same code and name.' : 'Practice ends here.';
+  openModal(`<h2>${role === 'host' ? 'Close the <span>room</span>?' : role === 'guest' ? 'Leave the <span>room</span>?' : 'Stop <span>practising</span>?'}</h2><p class="lede">${msg}</p>
+    <div class="sheet-actions"><button class="btn" type="button" data-close>Stay</button><button class="btn primary" type="button" id="mLeave">${role === 'host' ? 'Close room' : role === 'guest' ? 'Leave' : 'Start screen'}</button></div>`);
+}
+
+/* ================= starting things ================= */
+function readName(optional) {
+  const v = ($('hName').value || '').trim().slice(0, 14);
+  if (!v) { if (optional) { myName = myName || 'You'; return true; } homeMsg = 'Type your name first.'; homeErr = true; renderHome(); $('hName').focus(); return false; }
+  myName = v; setItem(LS, 'lg-name', v);
+  return true;
+}
+function startSolo() {
+  if (!readName(true)) return;
+  role = 'solo'; S = baseState('solo', roomOpts);
+  S.players.push(newPlayer(me, myName));
+  shownOver = null; lastKey = '';
+  newGame();
+}
+function createRoom() {
+  if (!readName()) return;
+  if (waitNet(createRoom)) return;
+  if (!netReady()) { homeMsg = "Couldn't load the connection tools. Check your internet and reload."; homeErr = true; renderHome(); return; }
+  role = 'host'; roomCode = (window.GN && GN.code()) || newCode(); hostSess = rid(); shownOver = null; lastKey = '';
+  S = baseState('room', roomOpts);
+  S.players.push(newPlayer(me, myName));
+  history.replaceState(null, '', '#' + roomCode);
+  openHostPeer(); startHostRelay();
+  changed();
+}
+function reopenRoom() {
+  const g = getItem(LS, 'lg-host');
+  if (!g || !g.S) return;
+  if (!readName()) return;
+  if (waitNet(reopenRoom)) return;
+  if (!netReady()) { homeMsg = "Couldn't load the connection tools. Check your internet and reload."; homeErr = true; renderHome(); return; }
+  role = 'host'; roomCode = g.code; hostSess = rid(); S = g.S;
+  const hp = S.players.find(p => p.id === S.hostId) || S.players[0];
+  if (hp) { hp.id = me; hp.name = myName; }
+  S.hostId = me; shownOver = null; lastKey = '';
+  if (S.phase === 'write' || S.phase === 'review') S.deadline = Math.max(S.deadline, Date.now() + 20000);
+  history.replaceState(null, '', '#' + roomCode);
+  openHostPeer(); startHostRelay();
+  normalizeHost();
+  changed();
+}
+function joinFromForm() {
+  if (!readName()) return;
+  const code = ($('hCode').value || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (code.length !== 4) { homeMsg = 'Room codes are 4 letters.'; homeErr = true; renderHome(); return; }
+  if (waitNet(joinFromForm)) return;
+  if (!netReady()) { homeMsg = "Couldn't load the connection tools. Check your internet and reload."; homeErr = true; renderHome(); return; }
+  history.replaceState(null, '', '#' + code);
+  pickFor = ''; shownOver = null; lastKey = '';
+  joinRoom(code);
+}
+/* typed words go to the host a moment after you stop typing, and again the moment time is up */
+function sendDraft() { clearTimeout(sendT); if (V && (V.phase === 'write' || V.phase === 'collect') && V.me >= 0) act('fill', { a: collectDraft() }); }
+
+/* ================= events ================= */
+$('hSolo').addEventListener('click', startSolo);
+$('hCreate').addEventListener('click', createRoom);
+$('hReopen').addEventListener('click', reopenRoom);
+$('joinForm').addEventListener('submit', e => { e.preventDefault(); joinFromForm(); });
+$('hRules').addEventListener('click', openRules);
+$('hName').addEventListener('input', () => { if (homeErr) { homeMsg = ''; homeErr = false; $('homeMsg').textContent = ''; } });
+$('lSet').addEventListener('click', e => {
+  if (role !== 'host' || !V) return;
+  const o = fixOpts(V.opts);
+  const l = e.target.closest('[data-lang]'), c = e.target.closest('[data-cat]');
+  if (l) o.lang = l.dataset.lang;
+  else if (c) { const k = c.dataset.cat; if (o.cats.includes(k)) { if (o.cats.length > 3) o.cats = o.cats.filter(x => x !== k); } else if (o.cats.length < 8) o.cats.push(k); }
+  else return;
+  roomOpts = o; setItem(LS, 'lg-opts', o); act('settings', o);
+});
+$('lSet').addEventListener('change', e => {
+  const s = e.target.closest('[data-opt]');
+  if (!s || role !== 'host') return;
+  const o = fixOpts(V.opts); o[s.dataset.opt] = +s.value;
+  roomOpts = o; setItem(LS, 'lg-opts', o); act('settings', o);
+});
+$('lStart').addEventListener('click', () => act('start'));
+$('lPlayers').addEventListener('click', e => { const b = e.target.closest('[data-remove]'); if (b) act('remove', { id: b.dataset.remove }); });
+$('lRules').addEventListener('click', openRules);
+$('lLeave').addEventListener('click', openLeave);
+$('lCopy').addEventListener('click', () => {
+  const link = shareLink(), msg = $('lCopyMsg');
+  const done = t => { msg.textContent = t; setTimeout(() => { msg.textContent = ''; }, 2500); };
+  if (navigator.share) { navigator.share({ title: 'Letter Game', text: `Join my Letter Game room. Code: ${roomCode}`, url: link }).catch(() => {}); return; }
+  const pickText = () => { const r = document.createRange(); r.selectNodeContents($('lLink')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); done('Link selected. Copy it from here.'); };
+  try { navigator.clipboard.writeText(link).then(() => done('Link copied. Send it to your friends.'), pickText); } catch (e) { pickText(); }
+});
+$('stage').addEventListener('input', e => {
+  if (!e.target.dataset.field) return;
+  collectDraft(); markFields();
+  const b = $('aStop'); if (b) b.disabled = !myFull();
+  clearTimeout(sendT); sendT = setTimeout(sendDraft, 600);
+});
+$('stage').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || !e.target.dataset.field) return;
+  e.preventDefault();
+  const all = [...document.querySelectorAll('[data-field]')]; const i = all.indexOf(e.target);
+  if (all[i + 1]) all[i + 1].focus(); else e.target.blur();
+});
+$('stage').addEventListener('click', e => {
+  const b = e.target.closest('[data-veto]');
+  if (!b || b.disabled) return;
+  act('veto', { t: +b.dataset.veto, k: b.dataset.k, on: b.getAttribute('aria-pressed') !== 'true' });
+});
+$('actMore').addEventListener('click', e => {
+  if (e.target.closest('#aStop')) { if (myFull()) act('stop', { a: collectDraft() }); }
+  else if (e.target.closest('#aScore')) act('score');
+  else if (e.target.closest('#aNext')) act('next');
+  else if (e.target.closest('#aNew')) { closeModal(); act('next'); }
+  else if (e.target.closest('#aResults')) openResults();
+});
+$('btnRules').addEventListener('click', openRules);
+$('btnScores').addEventListener('click', openScores);
+$('btnLeave').addEventListener('click', openLeave);
+$('btnMenu').addEventListener('click', () => {
+  openModal(`<h2>Menu</h2><div class="menu-list">
+      <button class="btn" type="button" id="mmRules">Rules</button>
+      <button class="btn" type="button" id="mmScores">Scores</button>
+      ${V && V.phase === 'over' ? '<button class="btn" type="button" id="mmResults">Results</button>' : ''}
+      <button class="btn" type="button" id="mmLeave">${role === 'host' ? 'Close room' : role === 'guest' ? 'Leave room' : 'Start screen'}</button>
+    </div><div class="sheet-actions"><button class="btn primary" type="button" data-close>Back to the game</button></div>`);
+});
+$('modal').addEventListener('click', e => {
+  if (e.target === $('modal') || e.target.closest('[data-close]')) closeModal();
+  else if (e.target.closest('#mmRules')) openRules();
+  else if (e.target.closest('#mmScores')) openScores();
+  else if (e.target.closest('#mmResults')) openResults();
+  else if (e.target.closest('#mmLeave')) openLeave();
+  else if (e.target.closest('#mNew')) { closeModal(); act('next'); }
+  else if (e.target.closest('#mLobby')) { closeModal(); act('lobby'); }
+  else if (e.target.closest('#mLeave')) { closeModal(); if (role === 'solo') { token++; clearTimeout(timer); role = null; S = null; V = null; shownOver = null; homeMsg = ''; homeErr = false; render(); } else leave(); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').hidden) closeModal(); });
+window.addEventListener('pagehide', () => { if (role === 'guest' && hostConn && hostConn.open) { try { hostConn.send({ t: 'away' }); } catch (e) { /* skip */ } } });
+window.addEventListener('beforeunload', e => { if (role === 'host' && conns.size && !window.GN_LEAVING) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ================= boot ================= */
+(function boot() {
+  const hashCode = (location.hash || '').replace('#', '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (hashCode.length === 4) $('hCode').value = hashCode;
+  const savedGuest = getItem(LS, 'lg-guest');
+  const savedHost = getItem(LS, 'lg-host');
+  render();
+  if (!onlineOK) return;
+  NET.then(() => {
+    if (role) return;
+    if (window.GN && GN.code()) { $('hName').value = GN.name(); if (GN.isHost()) createRoom(); else { $('hCode').value = GN.code(); joinFromForm(); } return; }
+    if (myName && savedHost && savedHost.code && hashCode === savedHost.code && netReady()) { reopenRoom(); return; }
+    if (myName && savedGuest && savedGuest.code && (!hashCode || hashCode === savedGuest.code) && netReady()) { joinRoom(savedGuest.code); return; }
+    if (hashCode.length === 4) { homeMsg = myName ? `Tap Join room to join room ${hashCode}.` : `Type your name, then tap Join room to join room ${hashCode}.`; renderHome(); }
+  });
+})();
+})();
+</script>
+
+</html>
